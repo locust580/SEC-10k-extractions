@@ -1,6 +1,7 @@
 from lxml import etree
 import os
 import pandas as pd
+import math
 
 xbrl_tags_income = {
     #Revenues
@@ -72,10 +73,57 @@ xbrl_tags_balance = {
 
 xbrl_tags_cashflow = {
     #Cash flows from operating activities:
-    'Net Income': [],
+    'Net income': ["NetIncomeLoss"],
+
     #Adjustments to reconcile net income to net cash provided by operating activities:
-        'Stock-based compensation expense': [],
+        'Stock-based compensation expense': ["ShareBasedCompensation"],
+        'Depreciation and amortization': ["DepreciationAndAmortization", "DepreciationDepletionAndAmortization"],
+        'Deferred income taxes': ["DeferredIncomeTaxExpenseBenefit"],
+        '(Gains) losses on non-marketable equity securities and publicly-held equity securities (net)': ["GainLossOnInvestments"],
+        'Acquisition termination cost': ["BusinessCombinationAdvancedConsiderationWrittenOff"],
+        'Other non-cash income expense': ["OtherNoncashIncomeExpense"],
+
+    #Changes in operating assets and liabilities, net of acquisitions:
+        'Accounts receivable': ["IncreaseDecreaseInAccountsReceivable"],
+        'Inventories': ["IncreaseDecreaseInInventories"],
+        'Prepaid expenses and other assets': ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"],
+        'Accounts payable': ["IncreaseDecreaseInAccountsPayable"],
+        'Accrued and other current liabilities': ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"],
+        'Other long-term liabilities': ["IncreaseDecreaseInOtherNoncurrentLiabilities"],
+
+    'Net cash provided by operating activities': ["NetCashProvidedByUsedInOperatingActivities"],
+
+    #Cash flows from investing activities:
+        'Proceeds from maturities of marketable securities': ["ProceedsFromSaleAndMaturityOfMarketableSecurities","ProceedsFromMaturitiesPrepaymentsAndCallsOfAvailableForSaleSecurities"],
+        'Proceeds from sales of marketable securities': ["ProceedsFromSaleOfAvailableForSaleSecuritiesDebt"],
+        'Proceeds from sales of non-marketable equity securities': ["ProceedsFromSaleOfEquitySecuritiesFvNi"],
+        'Purchases of marketable securities': ["PaymentsToAcquireAvailableForSaleSecuritiesDebt"],
+        'Purchases related to property and equipment and intangible assets': ["PurchasesOfPropertyAndEquipmentAndIntangibleAssets","PaymentsToAcquireProductiveAssets"],
+        'Purchases of non-marketable equity securities': ["PaymentsToAcquireEquitySecuritiesFvNi"],
+        'Acquisitions, net of cash acquired': ["PaymentsToAcquireBusinessesNetOfCashAcquired"],
+        'Payments for other investing proceeds': ["PaymentsForProceedsFromOtherInvestingActivities"],
+
+    'Net cash provided by (used in) investing activities': ["NetCashProvidedByUsedInInvestingActivities"],
+
+    #Cash flows from financing activities:
+        'Issuance of debt (net of issuance costs)': ["ProceedsFromDebtNetOfIssuanceCosts"],
+        'Proceeds related to employee stock plans': ["Netproceedspaymentsrelatedtoemployeestockplans","ProceedsFromStockPlans"],
+        'Payments related to repurchases of common stock': ["PaymentsForRepurchaseOfCommonStock"],
+        'Payments related to tax on restricted stock units': ["PaymentsRelatedToTaxWithholdingForShareBasedCompensation"],
+        'Repayment of debt': ["RepaymentsOfDebt"],
+        'Dividends paid': ["PaymentsOfDividends"],
+        'Principal payments on property and equipment (and intangible assets)': ["PaymentsForFinancedPropertyPlantAndEquipmentFinancingActivities","PaymentsForFinancedPropertyPlantAndEquipmentAndIntangibleAssetsFinancingActivities"],
+        'Proceeds from other financing activities payments': ["ProceedsFromPaymentsForOtherFinancingActivities"],
+
+    'Net cash used in financing activities': ["NetCashProvidedByUsedInFinancingActivities"],
+    'Change in cash and cash equivalents': ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect"],
+    'Cash and cash equivalents at end of period': ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],
+
+    #Supplemental disclosures of cash flow information:
+    'Cash paid for income taxes (net)': ["IncomeTaxesPaidNet"],
+    'Cash paid for interest': ["InterestPaidNet"],
 }
+
 
 folder = "10k_xml_files"
 xml_files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".xml")]
@@ -104,34 +152,29 @@ def findDate(root, date, elem):
         return False
 
 #Income from operations always needs double-checking
-def statementIncome(root, date, file_index):
-    for item in xbrl_tags_income:
-        for tag in xbrl_tags_income[item]:
+#Cash flows doesn't include cash at beginning of period (just use last period's EOY cash) 
+
+def getData(root, date, file_index, xbrl_tags):
+    for item in xbrl_tags:
+        properDates = []
+        properDateMaxValue = 0
+        for tag in xbrl_tags[item]:
             elems = root.xpath(f"//*[local-name()='{tag}']")  # searches entire tree, returns list of elements with the given tag in it
             if len(elems) != 0:
-                properDateMaxValue = max([int(float(e.text.strip())) for e in elems if findDate(root, date, e) == True])
-                #properDateMaxValue = properDateMaxValue / 1000000
                 try:
-                    csv_data[file_index][item] = properDateMaxValue
+                    properDates.extend([int(float(e.text.strip())) for e in elems if findDate(root, date, e) == True])
+                    if len(properDates) != 0:
+                        properDateMaxValue = max(properDates)
+                    else:
+                        properDateMaxValue = 0
                 except Exception as e:
-                    print(f"Error: {e}")
-
-def balanceSheet(root, date, file_index):
-    for item in xbrl_tags_balance:
-        for tag in xbrl_tags_balance[item]:
-            elems = root.xpath(f"//*[local-name()='{tag}']")  # searches entire tree, returns list of elements with the given tag in it
-            if len(elems) != 0:
-                properDateMaxValue = max([int(float(e.text.strip())) for e in elems if findDate(root, date, e) == True])
-                #dislike millions? uncomment below!
-                #properDateMaxValue = properDateMaxValue / 1000000
-                try:
-                    csv_data[file_index][item] = properDateMaxValue
-                except Exception as e:
-                    print(f"Error: {e}")
-    
-
-def cashFlows():
-    print("r")
+                    print(f"Error at 'properDateMaxValue': {e}")
+        #dislike millions? uncomment below!
+        properDateMaxValue = math.trunc(properDateMaxValue / 1000000)
+        try:
+            csv_data[file_index][item] = properDateMaxValue
+        except Exception as e:
+            print(f"Error at csv_data insertion: {e}")
 
 for file in sorted(xml_files):
     xmltree = etree.parse(file) # parses file into xml tree
@@ -143,11 +186,11 @@ for file in sorted(xml_files):
     csv_data.append({"Year": date.text.strip()[0:4]}) # appends each year's dictionary to data list, later turned into a csv pivoting around year
 
     if usr_input == "1":
-        statementIncome(root, date, file_index)
+        getData(root, date, file_index, xbrl_tags_income)
     elif usr_input == "2":
-        balanceSheet(root, date, file_index)
+        getData(root, date, file_index, xbrl_tags_balance)
     elif usr_input == "3":
-        cashFlows
+        getData(root, date, file_index, xbrl_tags_cashflow)
     else:
         print("Cmon man that's not a correct input")
         break
