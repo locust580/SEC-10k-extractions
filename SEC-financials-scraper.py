@@ -1,41 +1,42 @@
 from lxml import etree
 import os
 import pandas as pd
-import math
+# only 'not in use' because math is used for the millions reducer in getData(), which is usually commented out
+import math 
 
 xbrl_tags_income = {
-    #Revenues
+    "Revenues:": [],
     'Revenue': ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues'],
     'CoGS': ['CostOfGoodsAndServicesSold', 'CostOfRevenue'],
     'Gross Profit': ['GrossProfit'],
     
-    #Operating Expenses
+    "Operating Expenses:": [],
     'R&D': ['ResearchAndDevelopmentExpense'],
     'SG&A': ['SellingGeneralAndAdministrativeExpense'],
     'Total Operating Expenses': ['OperatingExpenses'],
 
-    #Total income after operating expenses taken out
+    "Total income after operating expenses taken out:": [],
     'Income from Operations': ['OperatingIncomeLoss'],
 
-    #D/A Expenses
+    "D/A Expenses:": [],
     'Depreciation': ['Depreciation'],
     'Amortization': ['AmortizationOfIntangibleAssets'],
 
-    #Interests
+    "Interests:": [],
     'Interest Income': ['InvestmentIncomeInterest'],
     'Interest Expense (Negative)': ['InterestExpense', 'InterestExpenseNonoperating'],
     'Other Net': ['OtherNonoperatingIncomeExpense'],
     'Other Income/Expense Net': ['NonoperatingIncomeExpense'],
 
-    #Final incomes
+    "Final incomes:": [],
     'Income Before Tax': ['IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest'],
     'Income Tax': ['IncomeTaxExpenseBenefit'],
     'Net Income': ['NetIncomeLoss']
 }
 
 xbrl_tags_balance = {
-    # Assets
-    # Current assets:
+    "Assets:": [],
+    "Current assets:": [],
         'Cash and cash equivalents': ["CashAndCashEquivalentsAtCarryingValue"],
         'Marketable securities': ["MarketableSecuritiesCurrent"],
         'Accounts receivable (net)': ["AccountsReceivableNetCurrent"],
@@ -43,7 +44,7 @@ xbrl_tags_balance = {
         'Prepaid expenses and other current assets': ["PrepaidExpenseAndOtherAssetsCurrent"],
     'Total current assets': ["AssetsCurrent"],
 
-    # Non-Current Assets:
+    "Non-Current Assets:": [],
     'Property and equipment (net)': ["PropertyPlantAndEquipmentNet"],
     'Operating lease assets': ["OperatingLeaseRightOfUseAsset"],
     'Goodwill': ["Goodwill"],
@@ -53,14 +54,14 @@ xbrl_tags_balance = {
     
     'Total assets': ["Assets"],
 
-    # Liabilities and Shareholders' Equity
-    # Current liabilities:
+    "Liabilities and Shareholders' Equity:": [],
+    "Current liabilities:": [],
         'Accounts payable': ["AccountsPayableCurrent"],
         'Accrued and other current liabilities': ["AccruedLiabilitiesCurrent"],
         'Short-term debt': ["DebtCurrent"],
     'Total current liabilities': ["LiabilitiesCurrent"],
 
-    # Non-Current Liabilities:
+    "Non-Current Liabilities:": [],
     'Long-term debt': ["LongTermDebtNoncurrent"],
     'Long-term operating lease liabilities': ["OperatingLeaseLiabilityNoncurrent"],
     'Other long-term liabilities': ["OtherLiabilitiesNoncurrent"],
@@ -72,18 +73,18 @@ xbrl_tags_balance = {
 }
 
 xbrl_tags_cashflow = {
-    #Cash flows from operating activities:
+    "Cash flows from operating activities:": [],
     'Net income': ["NetIncomeLoss"],
 
-    #Adjustments to reconcile net income to net cash provided by operating activities:
+    "Adjustments to reconcile net income to net cash provided by operating activities": [],
         'Stock-based compensation expense': ["ShareBasedCompensation"],
         'Depreciation and amortization': ["DepreciationAndAmortization", "DepreciationDepletionAndAmortization"],
         'Deferred income taxes': ["DeferredIncomeTaxExpenseBenefit"],
-        '(Gains) losses on non-marketable equity securities and publicly-held equity securities (net)': ["GainLossOnInvestments"],
+        'Net gains/losses on non-marketable/publicly-held equity securities': ["GainLossOnInvestments"],
         'Acquisition termination cost': ["BusinessCombinationAdvancedConsiderationWrittenOff"],
         'Other non-cash income expense': ["OtherNoncashIncomeExpense"],
 
-    #Changes in operating assets and liabilities, net of acquisitions:
+    "Changes in operating assets and liabilities net of acquisitions:": [],
         'Accounts receivable': ["IncreaseDecreaseInAccountsReceivable"],
         'Inventories': ["IncreaseDecreaseInInventories"],
         'Prepaid expenses and other assets': ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"],
@@ -93,33 +94,33 @@ xbrl_tags_cashflow = {
 
     'Net cash provided by operating activities': ["NetCashProvidedByUsedInOperatingActivities"],
 
-    #Cash flows from investing activities:
+    "Cash flows from investing activities:": [],
         'Proceeds from maturities of marketable securities': ["ProceedsFromSaleAndMaturityOfMarketableSecurities","ProceedsFromMaturitiesPrepaymentsAndCallsOfAvailableForSaleSecurities"],
         'Proceeds from sales of marketable securities': ["ProceedsFromSaleOfAvailableForSaleSecuritiesDebt"],
         'Proceeds from sales of non-marketable equity securities': ["ProceedsFromSaleOfEquitySecuritiesFvNi"],
         'Purchases of marketable securities': ["PaymentsToAcquireAvailableForSaleSecuritiesDebt"],
         'Purchases related to property and equipment and intangible assets': ["PurchasesOfPropertyAndEquipmentAndIntangibleAssets","PaymentsToAcquireProductiveAssets"],
         'Purchases of non-marketable equity securities': ["PaymentsToAcquireEquitySecuritiesFvNi"],
-        'Acquisitions, net of cash acquired': ["PaymentsToAcquireBusinessesNetOfCashAcquired"],
+        'Acquisitions (net of cash acquired)': ["PaymentsToAcquireBusinessesNetOfCashAcquired"],
         'Payments for other investing proceeds': ["PaymentsForProceedsFromOtherInvestingActivities"],
 
     'Net cash provided by (used in) investing activities': ["NetCashProvidedByUsedInInvestingActivities"],
 
-    #Cash flows from financing activities:
+    "Cash flows from financing activities:": [],
         'Issuance of debt (net of issuance costs)': ["ProceedsFromDebtNetOfIssuanceCosts"],
         'Proceeds related to employee stock plans': ["Netproceedspaymentsrelatedtoemployeestockplans","ProceedsFromStockPlans"],
         'Payments related to repurchases of common stock': ["PaymentsForRepurchaseOfCommonStock"],
         'Payments related to tax on restricted stock units': ["PaymentsRelatedToTaxWithholdingForShareBasedCompensation"],
         'Repayment of debt': ["RepaymentsOfDebt"],
         'Dividends paid': ["PaymentsOfDividends"],
-        'Principal payments on property and equipment (and intangible assets)': ["PaymentsForFinancedPropertyPlantAndEquipmentFinancingActivities","PaymentsForFinancedPropertyPlantAndEquipmentAndIntangibleAssetsFinancingActivities"],
+        'Principal payments on property equipment and intangible assets': ["PaymentsForFinancedPropertyPlantAndEquipmentFinancingActivities","PaymentsForFinancedPropertyPlantAndEquipmentAndIntangibleAssetsFinancingActivities"],
         'Proceeds from other financing activities payments': ["ProceedsFromPaymentsForOtherFinancingActivities"],
 
     'Net cash used in financing activities': ["NetCashProvidedByUsedInFinancingActivities"],
     'Change in cash and cash equivalents': ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect"],
     'Cash and cash equivalents at end of period': ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],
 
-    #Supplemental disclosures of cash flow information:
+    "Supplemental disclosures of cash flow information:": [],
     'Cash paid for income taxes (net)': ["IncomeTaxesPaidNet"],
     'Cash paid for interest': ["InterestPaidNet"],
 }
@@ -158,23 +159,29 @@ def getData(root, date, file_index, xbrl_tags):
     for item in xbrl_tags:
         properDates = []
         properDateMaxValue = 0
-        for tag in xbrl_tags[item]:
-            elems = root.xpath(f"//*[local-name()='{tag}']")  # searches entire tree, returns list of elements with the given tag in it
-            if len(elems) != 0:
-                try:
-                    properDates.extend([int(float(e.text.strip())) for e in elems if findDate(root, date, e) == True])
-                    if len(properDates) != 0:
-                        properDateMaxValue = max(properDates)
-                    else:
-                        properDateMaxValue = 0
-                except Exception as e:
-                    print(f"Error at 'properDateMaxValue': {e}")
-        #dislike millions? uncomment below!
-        properDateMaxValue = math.trunc(properDateMaxValue / 1000000)
-        try:
-            csv_data[file_index][item] = properDateMaxValue
-        except Exception as e:
-            print(f"Error at csv_data insertion: {e}")
+        if len(xbrl_tags[item]) != 0:
+            for tag in xbrl_tags[item]:
+                elems = root.xpath(f"//*[local-name()='{tag}']")  # searches entire tree, returns list of elements with the given tag in it
+                if len(elems) != 0:
+                    try:
+                        properDates.extend([int(float(e.text.strip())) for e in elems if findDate(root, date, e) == True])
+                        if len(properDates) != 0:
+                            properDateMaxValue = max(properDates)
+                        else:
+                            properDateMaxValue = 0
+                    except Exception as e:
+                        print(f"Error at 'properDateMaxValue': {e}")
+            #dislike millions? uncomment below!
+            properDateMaxValue = math.trunc(properDateMaxValue / 1000000)
+            try:
+                csv_data[file_index][item] = properDateMaxValue
+            except Exception as e:
+                print(f"Error at csv_data insertion: {e}")
+        else:
+            try:
+                csv_data[file_index][item] = ""
+            except Exception as e:
+                print(f"Error at csv_data insertion: {e}")
 
 for file in sorted(xml_files):
     xmltree = etree.parse(file) # parses file into xml tree
@@ -197,8 +204,6 @@ for file in sorted(xml_files):
 
     file_index += 1
 
-
-
 csv_file = pd.DataFrame(csv_data).set_index("Year").T
 print(csv_file)
 companyString = xml_files[0][len(folder)+1:len(folder)+5]
@@ -208,5 +213,4 @@ elif usr_input == "2":
     csv_file.to_csv(f"bsttmnts-{companyString}-{file_dates[0]}-{file_dates[len(file_dates)-1]}.csv")
 elif usr_input == "3":
     csv_file.to_csv(f"csttmnts-{companyString}-{file_dates[0]}-{file_dates[len(file_dates)-1]}.csv")
-
 
